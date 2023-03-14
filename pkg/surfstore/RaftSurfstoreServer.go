@@ -2,6 +2,7 @@ package surfstore
 
 import (
 	context "context"
+	"errors"
 	"log"
 	"sort"
 	"sync"
@@ -50,26 +51,25 @@ func (s *RaftSurfstore) GetFileInfoMap(ctx context.Context, empty *emptypb.Empty
 		s.isCrashedMutex.RUnlock()
 	}
 
-	for {
-		// send heartbeat to all other servers
-		hb, err := s.SendHeartbeat(ctx, &emptypb.Empty{})
-		if err != nil {
-			return nil, err
-		}
-		s.isLeaderMutex.RLock()
-		if !s.isLeader {
-			s.isLeaderMutex.RUnlock()
-			return nil, ERR_NOT_LEADER
-		} else {
-			s.isLeaderMutex.RUnlock()
-		}
-
-		if hb.Flag {
-			// if successful, read from state machine
-			return s.metaStore.GetFileInfoMap(ctx, empty)
-		}
+	// send heartbeat to all other servers
+	hb, err := s.SendHeartbeat(ctx, &emptypb.Empty{})
+	if err != nil {
+		return nil, err
 	}
-	// return nil, errors.New("failed to find majority")
+	s.isLeaderMutex.RLock()
+	if !s.isLeader {
+		s.isLeaderMutex.RUnlock()
+		return nil, ERR_NOT_LEADER
+	} else {
+		s.isLeaderMutex.RUnlock()
+	}
+
+	if hb.Flag {
+		// if successful, read from state machine
+		return s.metaStore.GetFileInfoMap(ctx, empty)
+	}
+
+	return nil, errors.New("failed to find majority")
 }
 
 func (s *RaftSurfstore) GetBlockStoreMap(ctx context.Context, hashes *BlockHashes) (*BlockStoreMap, error) {
@@ -88,26 +88,24 @@ func (s *RaftSurfstore) GetBlockStoreMap(ctx context.Context, hashes *BlockHashe
 		s.isCrashedMutex.RUnlock()
 	}
 
-	for {
-		// send heartbeat to all other servers
-		hb, err := s.SendHeartbeat(ctx, &emptypb.Empty{})
-		if err != nil {
-			return nil, err
-		}
-		s.isLeaderMutex.RLock()
-		if !s.isLeader {
-			s.isLeaderMutex.RUnlock()
-			return nil, ERR_NOT_LEADER
-		} else {
-			s.isLeaderMutex.RUnlock()
-		}
-
-		if hb.Flag {
-			// if successful, apply to state machine
-			return s.metaStore.GetBlockStoreMap(ctx, hashes)
-		}
+	// send heartbeat to all other servers
+	hb, err := s.SendHeartbeat(ctx, &emptypb.Empty{})
+	if err != nil {
+		return nil, err
 	}
-	// return nil, errors.New("failed to find majority")
+	s.isLeaderMutex.RLock()
+	if !s.isLeader {
+		s.isLeaderMutex.RUnlock()
+		return nil, ERR_NOT_LEADER
+	} else {
+		s.isLeaderMutex.RUnlock()
+	}
+
+	if hb.Flag {
+		// if successful, apply to state machine
+		return s.metaStore.GetBlockStoreMap(ctx, hashes)
+	}
+	return nil, errors.New("failed to find majority")
 }
 
 func (s *RaftSurfstore) GetBlockStoreAddrs(ctx context.Context, empty *emptypb.Empty) (*BlockStoreAddrs, error) {
@@ -126,26 +124,24 @@ func (s *RaftSurfstore) GetBlockStoreAddrs(ctx context.Context, empty *emptypb.E
 		s.isCrashedMutex.RUnlock()
 	}
 
-	for {
-		// send heartbeat to all other servers
-		hb, err := s.SendHeartbeat(ctx, &emptypb.Empty{})
-		if err != nil {
-			return nil, err
-		}
-		s.isLeaderMutex.RLock()
-		if !s.isLeader {
-			s.isLeaderMutex.RUnlock()
-			return nil, ERR_NOT_LEADER
-		} else {
-			s.isLeaderMutex.RUnlock()
-		}
-
-		if hb.Flag {
-			// if successful, apply to state machine
-			return s.metaStore.GetBlockStoreAddrs(ctx, empty)
-		}
+	// send heartbeat to all other servers
+	hb, err := s.SendHeartbeat(ctx, &emptypb.Empty{})
+	if err != nil {
+		return nil, err
 	}
-	// return nil, errors.New("failed to find majority")
+	s.isLeaderMutex.RLock()
+	if !s.isLeader {
+		s.isLeaderMutex.RUnlock()
+		return nil, ERR_NOT_LEADER
+	} else {
+		s.isLeaderMutex.RUnlock()
+	}
+
+	if hb.Flag {
+		// if successful, apply to state machine
+		return s.metaStore.GetBlockStoreAddrs(ctx, empty)
+	}
+	return nil, errors.New("failed to find majority")
 }
 
 func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) (*Version, error) {
