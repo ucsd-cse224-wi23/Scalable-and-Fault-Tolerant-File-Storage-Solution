@@ -57,7 +57,7 @@ func (s *RaftSurfstore) GetFileInfoMap(ctx context.Context, empty *emptypb.Empty
 		return nil, err
 	}
 	if hb.Flag {
-		// if successful, apply to state machine
+		// if successful, read from state machine
 		return s.metaStore.GetFileInfoMap(ctx, empty)
 	}
 	return nil, errors.New("failed to find majority")
@@ -120,6 +120,21 @@ func (s *RaftSurfstore) GetBlockStoreAddrs(ctx context.Context, empty *emptypb.E
 }
 
 func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) (*Version, error) {
+	s.isLeaderMutex.RLock()
+	if !s.isLeader {
+		s.isLeaderMutex.RUnlock()
+		return nil, ERR_NOT_LEADER
+	} else {
+		s.isLeaderMutex.RUnlock()
+	}
+
+	s.isCrashedMutex.RLock()
+	if s.isCrashed {
+		s.isCrashedMutex.RUnlock()
+		return nil, ERR_SERVER_CRASHED
+	} else {
+		s.isCrashedMutex.RUnlock()
+	}
 	// append entry to log
 	s.log = append(s.log, &UpdateOperation{
 		Term:         s.term,
@@ -319,6 +334,13 @@ func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInp
 }
 
 func (s *RaftSurfstore) SetLeader(ctx context.Context, _ *emptypb.Empty) (*Success, error) {
+	s.isCrashedMutex.RLock()
+	if s.isCrashed {
+		s.isCrashedMutex.RUnlock()
+		return nil, ERR_SERVER_CRASHED
+	} else {
+		s.isCrashedMutex.RUnlock()
+	}
 	s.isLeaderMutex.Lock()
 	defer s.isLeaderMutex.Unlock()
 	s.isLeader = true
