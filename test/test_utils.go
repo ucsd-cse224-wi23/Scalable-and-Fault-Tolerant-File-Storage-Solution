@@ -307,7 +307,7 @@ func KillSurfServers(servers []*exec.Cmd) {
 }
 
 func SyncClient(metaAddr, baseDir string, blockSize int, cfgPath string) error {
-	clientCmd := exec.Command("_bin/SurfstoreClientExec", "-f", cfgPath, baseDir, strconv.Itoa(blockSize))
+	clientCmd := exec.Command("_bin/SurfstoreClientExec", "-d", "-f", cfgPath, baseDir, strconv.Itoa(blockSize))
 	clientCmd.Stderr = os.Stderr
 	clientCmd.Stdout = os.Stdout
 
