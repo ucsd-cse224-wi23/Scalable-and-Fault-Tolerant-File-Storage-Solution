@@ -133,10 +133,12 @@ func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) 
 		return nil, err
 	}
 	if s.commitIndex > s.lastApplied {
-		s.metaStore.UpdateFile(ctx, filemeta)
+		version, err := s.metaStore.UpdateFile(ctx, filemeta)
 		s.lastApplied = s.commitIndex
+		return &Version{Version: version.Version}, err
 	}
 
+	// TODO change this to return the version of the file
 	return &Version{Version: filemeta.Version}, nil
 }
 
