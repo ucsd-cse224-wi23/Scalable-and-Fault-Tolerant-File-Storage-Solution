@@ -37,110 +37,115 @@ type RaftSurfstore struct {
 }
 
 func (s *RaftSurfstore) GetFileInfoMap(ctx context.Context, empty *emptypb.Empty) (*FileInfoMap, error) {
-	s.isLeaderMutex.RLock()
-	if !s.isLeader {
-		s.isLeaderMutex.RUnlock()
-		return nil, ERR_NOT_LEADER
-	} else {
-		s.isLeaderMutex.RUnlock()
-	}
-	s.isCrashedMutex.RLock()
-	if s.isCrashed {
-		s.isCrashedMutex.RUnlock()
-		return nil, ERR_SERVER_CRASHED
-	} else {
-		s.isCrashedMutex.RUnlock()
-	}
+	for {
+		s.isLeaderMutex.RLock()
+		if !s.isLeader {
+			s.isLeaderMutex.RUnlock()
+			return nil, ERR_NOT_LEADER
+		} else {
+			s.isLeaderMutex.RUnlock()
+		}
+		s.isCrashedMutex.RLock()
+		if s.isCrashed {
+			s.isCrashedMutex.RUnlock()
+			return nil, ERR_SERVER_CRASHED
+		} else {
+			s.isCrashedMutex.RUnlock()
+		}
 
-	// send heartbeat to all other servers
-	hb, err := s.SendHeartbeat(ctx, &emptypb.Empty{})
-	if err != nil {
-		return nil, err
-	}
-	s.isLeaderMutex.RLock()
-	if !s.isLeader {
-		s.isLeaderMutex.RUnlock()
-		return nil, ERR_NOT_LEADER
-	} else {
-		s.isLeaderMutex.RUnlock()
-	}
+		// send heartbeat to all other servers
+		hb, err := s.SendHeartbeat(ctx, &emptypb.Empty{})
+		if err != nil {
+			return nil, err
+		}
+		s.isLeaderMutex.RLock()
+		if !s.isLeader {
+			s.isLeaderMutex.RUnlock()
+			return nil, ERR_NOT_LEADER
+		} else {
+			s.isLeaderMutex.RUnlock()
+		}
 
-	if hb.Flag {
-		// if successful, read from state machine
-		return s.metaStore.GetFileInfoMap(ctx, empty)
+		if hb.Flag {
+			// if successful, read from state machine
+			return s.metaStore.GetFileInfoMap(ctx, empty)
+		}
 	}
-
 	return nil, errors.New("failed to find majority")
 }
 
 func (s *RaftSurfstore) GetBlockStoreMap(ctx context.Context, hashes *BlockHashes) (*BlockStoreMap, error) {
-	s.isLeaderMutex.RLock()
-	if !s.isLeader {
-		s.isLeaderMutex.RUnlock()
-		return nil, ERR_NOT_LEADER
-	} else {
-		s.isLeaderMutex.RUnlock()
-	}
-	s.isCrashedMutex.RLock()
-	if s.isCrashed {
-		s.isCrashedMutex.RUnlock()
-		return nil, ERR_SERVER_CRASHED
-	} else {
-		s.isCrashedMutex.RUnlock()
-	}
+	for {
+		s.isLeaderMutex.RLock()
+		if !s.isLeader {
+			s.isLeaderMutex.RUnlock()
+			return nil, ERR_NOT_LEADER
+		} else {
+			s.isLeaderMutex.RUnlock()
+		}
+		s.isCrashedMutex.RLock()
+		if s.isCrashed {
+			s.isCrashedMutex.RUnlock()
+			return nil, ERR_SERVER_CRASHED
+		} else {
+			s.isCrashedMutex.RUnlock()
+		}
 
-	// send heartbeat to all other servers
-	hb, err := s.SendHeartbeat(ctx, &emptypb.Empty{})
-	if err != nil {
-		return nil, err
-	}
-	s.isLeaderMutex.RLock()
-	if !s.isLeader {
-		s.isLeaderMutex.RUnlock()
-		return nil, ERR_NOT_LEADER
-	} else {
-		s.isLeaderMutex.RUnlock()
-	}
+		// send heartbeat to all other servers
+		hb, err := s.SendHeartbeat(ctx, &emptypb.Empty{})
+		if err != nil {
+			return nil, err
+		}
+		s.isLeaderMutex.RLock()
+		if !s.isLeader {
+			s.isLeaderMutex.RUnlock()
+			return nil, ERR_NOT_LEADER
+		} else {
+			s.isLeaderMutex.RUnlock()
+		}
 
-	if hb.Flag {
-		// if successful, apply to state machine
-		return s.metaStore.GetBlockStoreMap(ctx, hashes)
+		if hb.Flag {
+			// if successful, apply to state machine
+			return s.metaStore.GetBlockStoreMap(ctx, hashes)
+		}
 	}
 	return nil, errors.New("failed to find majority")
 }
 
 func (s *RaftSurfstore) GetBlockStoreAddrs(ctx context.Context, empty *emptypb.Empty) (*BlockStoreAddrs, error) {
-	s.isLeaderMutex.RLock()
-	if !s.isLeader {
-		s.isLeaderMutex.RUnlock()
-		return nil, ERR_NOT_LEADER
-	} else {
-		s.isLeaderMutex.RUnlock()
-	}
-	s.isCrashedMutex.RLock()
-	if s.isCrashed {
-		s.isCrashedMutex.RUnlock()
-		return nil, ERR_SERVER_CRASHED
-	} else {
-		s.isCrashedMutex.RUnlock()
-	}
+	for {
+		s.isLeaderMutex.RLock()
+		if !s.isLeader {
+			s.isLeaderMutex.RUnlock()
+			return nil, ERR_NOT_LEADER
+		} else {
+			s.isLeaderMutex.RUnlock()
+		}
+		s.isCrashedMutex.RLock()
+		if s.isCrashed {
+			s.isCrashedMutex.RUnlock()
+			return nil, ERR_SERVER_CRASHED
+		} else {
+			s.isCrashedMutex.RUnlock()
+		}
 
-	// send heartbeat to all other servers
-	hb, err := s.SendHeartbeat(ctx, &emptypb.Empty{})
-	if err != nil {
-		return nil, err
-	}
-	s.isLeaderMutex.RLock()
-	if !s.isLeader {
-		s.isLeaderMutex.RUnlock()
-		return nil, ERR_NOT_LEADER
-	} else {
-		s.isLeaderMutex.RUnlock()
-	}
+		// send heartbeat to all other servers
+		hb, err := s.SendHeartbeat(ctx, &emptypb.Empty{})
+		if err != nil {
+			return nil, err
+		}
+		s.isLeaderMutex.RLock()
+		if !s.isLeader {
+			s.isLeaderMutex.RUnlock()
+			return nil, ERR_NOT_LEADER
+		} else {
+			s.isLeaderMutex.RUnlock()
+		}
 
-	if hb.Flag {
-		// if successful, apply to state machine
-		return s.metaStore.GetBlockStoreAddrs(ctx, empty)
+		if hb.Flag {
+			// if successful, apply to state machine
+			return s.metaStore.GetBlockStoreAddrs(ctx, empty)
+		}
 	}
 	return nil, errors.New("failed to find majority")
 }
@@ -167,6 +172,13 @@ func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) 
 		FileMetaData: filemeta,
 	})
 	for {
+		s.isCrashedMutex.RLock()
+		if s.isCrashed {
+			s.isCrashedMutex.RUnlock()
+			return nil, ERR_SERVER_CRASHED
+		} else {
+			s.isCrashedMutex.RUnlock()
+		}
 		// send AppendEntries RPC to all other servers
 		_, err := s.SendToAllPeers(ctx)
 
