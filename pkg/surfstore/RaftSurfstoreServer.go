@@ -70,6 +70,9 @@ func (s *RaftSurfstore) GetFileInfoMap(ctx context.Context, empty *emptypb.Empty
 			// if successful, read from state machine
 			return s.metaStore.GetFileInfoMap(ctx, empty)
 		}
+
+		// if not successful, retry
+		time.Sleep(100 * time.Millisecond)
 	}
 	return nil, errors.New("failed to find majority")
 }
@@ -108,6 +111,9 @@ func (s *RaftSurfstore) GetBlockStoreMap(ctx context.Context, hashes *BlockHashe
 			// if successful, apply to state machine
 			return s.metaStore.GetBlockStoreMap(ctx, hashes)
 		}
+
+		// if not successful, retry
+		time.Sleep(100 * time.Millisecond)
 	}
 	return nil, errors.New("failed to find majority")
 }
@@ -146,6 +152,9 @@ func (s *RaftSurfstore) GetBlockStoreAddrs(ctx context.Context, empty *emptypb.E
 			// if successful, apply to state machine
 			return s.metaStore.GetBlockStoreAddrs(ctx, empty)
 		}
+
+		// if not successful, retry
+		time.Sleep(100 * time.Millisecond)
 	}
 	return nil, errors.New("failed to find majority")
 }
