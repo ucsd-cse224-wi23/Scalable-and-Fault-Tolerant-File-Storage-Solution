@@ -163,11 +163,19 @@ func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) 
 			return nil, err
 		}
 		log.Println("commitIndex: ", s.commitIndex, " lastApplied: ", s.lastApplied)
-		if s.commitIndex > s.lastApplied {
-			version, err := s.metaStore.UpdateFile(ctx, filemeta)
+		if s.commitIndex == int64(len(s.log)-1) {
+			// if successful, apply to state machine
+			for i := s.lastApplied + 1; i <= s.commitIndex-1; i++ {
+				s.metaStore.UpdateFile(ctx, s.log[i].FileMetaData)
+			}
 			s.lastApplied = s.commitIndex
-			return &Version{Version: version.Version}, err
+			return s.metaStore.UpdateFile(ctx, filemeta)
 		}
+		// if s.commitIndex > s.lastApplied {
+		// 	version, err := s.metaStore.UpdateFile(ctx, filemeta)
+		// 	s.lastApplied = s.commitIndex
+		// 	return &Version{Version: version.Version}, err
+		// }
 		// if not successful, wait for next heartbeat
 		time.Sleep(1000 * time.Millisecond)
 	}
@@ -205,12 +213,13 @@ func (s *RaftSurfstore) SendToAllPeers(ctx context.Context) (int, error) {
 	})
 	log.Println("matchIndexList: ", matchIndexList)
 	medianMatchIndex := matchIndexList[len(s.peers)/2]
-	if int64(medianMatchIndex) > s.commitIndex {
-		for i := s.commitIndex + 1; i <= int64(medianMatchIndex); i++ {
-			s.metaStore.UpdateFile(ctx, s.log[i].FileMetaData)
-		}
-		s.commitIndex = int64(medianMatchIndex)
-	}
+	s.commitIndex = int64(medianMatchIndex)
+	// if int64(medianMatchIndex) > s.commitIndex {
+	// 	for i := s.commitIndex + 1; i <= int64(medianMatchIndex); i++ {
+	// 		s.metaStore.UpdateFile(ctx, s.log[i].FileMetaData)
+	// 	}
+	// 	s.commitIndex = int64(medianMatchIndex)
+	// }
 	return totalActive, nil
 }
 
@@ -240,7 +249,7 @@ func (s *RaftSurfstore) SendToPeer(ctx context.Context, peer_id int, responses c
 			PrevLogIndex: s.nextIndex[peer_id] - 1,
 			PrevLogTerm:  s.log[s.nextIndex[peer_id]-1].Term,
 			Entries:      s.log[s.nextIndex[peer_id]:],
-			LeaderCommit: s.commitIndex,
+			LeaderCommit: s.lastApplied,
 		}
 	}
 
