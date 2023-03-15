@@ -241,7 +241,7 @@ func (s *RaftSurfstore) SendToPeer(ctx context.Context, peer_id int, responses c
 			PrevLogIndex: -1,
 			PrevLogTerm:  -1,
 			Entries:      s.log,
-			LeaderCommit: s.commitIndex,
+			LeaderCommit: s.lastApplied,
 		}
 	} else {
 		appendInput = &AppendEntryInput{
