@@ -6,6 +6,7 @@ import (
 	"log"
 	"sort"
 	"sync"
+	"time"
 
 	grpc "google.golang.org/grpc"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
@@ -145,27 +146,27 @@ func (s *RaftSurfstore) GetBlockStoreAddrs(ctx context.Context, empty *emptypb.E
 }
 
 func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) (*Version, error) {
-	for {
-		s.isLeaderMutex.RLock()
-		if !s.isLeader {
-			s.isLeaderMutex.RUnlock()
-			return nil, ERR_NOT_LEADER
-		} else {
-			s.isLeaderMutex.RUnlock()
-		}
+	s.isLeaderMutex.RLock()
+	if !s.isLeader {
+		s.isLeaderMutex.RUnlock()
+		return nil, ERR_NOT_LEADER
+	} else {
+		s.isLeaderMutex.RUnlock()
+	}
 
-		s.isCrashedMutex.RLock()
-		if s.isCrashed {
-			s.isCrashedMutex.RUnlock()
-			return nil, ERR_SERVER_CRASHED
-		} else {
-			s.isCrashedMutex.RUnlock()
-		}
-		// append entry to log
-		s.log = append(s.log, &UpdateOperation{
-			Term:         s.term,
-			FileMetaData: filemeta,
-		})
+	s.isCrashedMutex.RLock()
+	if s.isCrashed {
+		s.isCrashedMutex.RUnlock()
+		return nil, ERR_SERVER_CRASHED
+	} else {
+		s.isCrashedMutex.RUnlock()
+	}
+	// append entry to log
+	s.log = append(s.log, &UpdateOperation{
+		Term:         s.term,
+		FileMetaData: filemeta,
+	})
+	for {
 		// send AppendEntries RPC to all other servers
 		_, err := s.SendToAllPeers(ctx)
 
@@ -179,6 +180,8 @@ func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) 
 			s.lastApplied = s.commitIndex
 			return &Version{Version: version.Version}, err
 		}
+		// if not successful, wait for next heartbeat
+		time.Sleep(1000 * time.Millisecond)
 	}
 	// TODO change this to return the version of the file
 	return &Version{Version: filemeta.Version}, nil
