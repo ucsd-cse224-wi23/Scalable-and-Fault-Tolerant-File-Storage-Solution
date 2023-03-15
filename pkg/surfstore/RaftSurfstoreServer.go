@@ -145,39 +145,41 @@ func (s *RaftSurfstore) GetBlockStoreAddrs(ctx context.Context, empty *emptypb.E
 }
 
 func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) (*Version, error) {
-	s.isLeaderMutex.RLock()
-	if !s.isLeader {
-		s.isLeaderMutex.RUnlock()
-		return nil, ERR_NOT_LEADER
-	} else {
-		s.isLeaderMutex.RUnlock()
-	}
+	for {
+		s.isLeaderMutex.RLock()
+		if !s.isLeader {
+			s.isLeaderMutex.RUnlock()
+			return nil, ERR_NOT_LEADER
+		} else {
+			s.isLeaderMutex.RUnlock()
+		}
 
-	s.isCrashedMutex.RLock()
-	if s.isCrashed {
-		s.isCrashedMutex.RUnlock()
-		return nil, ERR_SERVER_CRASHED
-	} else {
-		s.isCrashedMutex.RUnlock()
-	}
-	// append entry to log
-	s.log = append(s.log, &UpdateOperation{
-		Term:         s.term,
-		FileMetaData: filemeta,
-	})
-	// send AppendEntries RPC to all other servers
-	_, err := s.SendToAllPeers(ctx)
+		s.isCrashedMutex.RLock()
+		if s.isCrashed {
+			s.isCrashedMutex.RUnlock()
+			return nil, ERR_SERVER_CRASHED
+		} else {
+			s.isCrashedMutex.RUnlock()
+		}
+		// append entry to log
+		s.log = append(s.log, &UpdateOperation{
+			Term:         s.term,
+			FileMetaData: filemeta,
+		})
+		// send AppendEntries RPC to all other servers
+		_, err := s.SendToAllPeers(ctx)
 
-	// if successful, apply to state machine
-	if err != nil {
-		return nil, err
+		// if successful, apply to state machine
+		if err != nil {
+			return nil, err
+		}
+		log.Println("commitIndex: ", s.commitIndex, " lastApplied: ", s.lastApplied)
+		if s.commitIndex > s.lastApplied {
+			version, err := s.metaStore.UpdateFile(ctx, filemeta)
+			s.lastApplied = s.commitIndex
+			return &Version{Version: version.Version}, err
+		}
 	}
-	if s.commitIndex > s.lastApplied {
-		version, err := s.metaStore.UpdateFile(ctx, filemeta)
-		s.lastApplied = s.commitIndex
-		return &Version{Version: version.Version}, err
-	}
-
 	// TODO change this to return the version of the file
 	return &Version{Version: filemeta.Version}, nil
 }
@@ -193,14 +195,6 @@ func (s *RaftSurfstore) SendToAllPeers(ctx context.Context) (int, error) {
 		go s.SendToPeer(ctx, idx, responses)
 	}
 
-	s.isLeaderMutex.RLock()
-	if !s.isLeader {
-		s.isLeaderMutex.RUnlock()
-		return 0, nil
-	} else {
-		s.isLeaderMutex.RUnlock()
-	}
-
 	totalActive := 0
 	matchIndexList := make([]int, len(s.peers))
 	for i := 0; i < len(s.peers); i++ {
@@ -209,10 +203,20 @@ func (s *RaftSurfstore) SendToAllPeers(ctx context.Context) (int, error) {
 			totalActive++
 		}
 	}
+
+	s.isLeaderMutex.RLock()
+	if !s.isLeader {
+		s.isLeaderMutex.RUnlock()
+		return 0, ERR_NOT_LEADER
+	} else {
+		s.isLeaderMutex.RUnlock()
+	}
+
 	// sort matchIndexList in descending order
 	sort.Slice(matchIndexList, func(i, j int) bool {
 		return matchIndexList[i] > matchIndexList[j]
 	})
+	log.Println("matchIndexList: ", matchIndexList)
 	medianMatchIndex := matchIndexList[len(s.peers)/2]
 	if int64(medianMatchIndex) > s.commitIndex {
 		for i := s.commitIndex + 1; i <= int64(medianMatchIndex); i++ {
@@ -295,6 +299,7 @@ func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInp
 	} else {
 		s.isCrashedMutex.RUnlock()
 	}
+
 	if input.Term > s.term {
 		s.term = input.Term
 		s.isLeaderMutex.Lock()
@@ -312,6 +317,7 @@ func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInp
 	}
 
 	if input.PrevLogIndex >= 0 {
+
 		// TODO check if log contains entry at prevLogIndex whose term matches prevLogTerm
 		if input.PrevLogIndex >= int64(len(s.log)) || s.log[input.PrevLogIndex].Term != input.PrevLogTerm {
 			return &AppendEntryOutput{
@@ -322,7 +328,7 @@ func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInp
 			}, nil
 		}
 	}
-	log.Println("AppendEntries: ", input)
+	log.Println("AppendEntries: ", "Term", input.Term, "PrevLogIndex", input.PrevLogIndex, "PrevLogTerm", input.PrevLogTerm, "Entries", input.Entries, "LeaderCommit", input.LeaderCommit, s.peers[s.id])
 	// TODO delete existing entries that conflict with new ones
 	for i := 0; i < len(input.Entries); i++ {
 		k := int(input.PrevLogIndex) + 1 + i
