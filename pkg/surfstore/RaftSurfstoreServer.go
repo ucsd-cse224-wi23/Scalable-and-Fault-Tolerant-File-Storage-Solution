@@ -2,7 +2,6 @@ package surfstore
 
 import (
 	context "context"
-	"errors"
 	"log"
 	"sort"
 	"sync"
@@ -38,19 +37,11 @@ type RaftSurfstore struct {
 
 func (s *RaftSurfstore) GetFileInfoMap(ctx context.Context, empty *emptypb.Empty) (*FileInfoMap, error) {
 	for {
-		s.isLeaderMutex.RLock()
-		if !s.isLeader {
-			s.isLeaderMutex.RUnlock()
-			return nil, ERR_NOT_LEADER
-		} else {
-			s.isLeaderMutex.RUnlock()
-		}
-		s.isCrashedMutex.RLock()
-		if s.isCrashed {
-			s.isCrashedMutex.RUnlock()
+		if s.CheckIfCrashed() {
 			return nil, ERR_SERVER_CRASHED
-		} else {
-			s.isCrashedMutex.RUnlock()
+		}
+		if !s.CheckIfLeader() {
+			return nil, ERR_NOT_LEADER
 		}
 
 		// send heartbeat to all other servers
@@ -58,12 +49,11 @@ func (s *RaftSurfstore) GetFileInfoMap(ctx context.Context, empty *emptypb.Empty
 		if err != nil {
 			return nil, err
 		}
-		s.isLeaderMutex.RLock()
-		if !s.isLeader {
-			s.isLeaderMutex.RUnlock()
+		if s.CheckIfCrashed() {
+			return nil, ERR_SERVER_CRASHED
+		}
+		if !s.CheckIfLeader() {
 			return nil, ERR_NOT_LEADER
-		} else {
-			s.isLeaderMutex.RUnlock()
 		}
 
 		if hb.Flag {
@@ -74,24 +64,16 @@ func (s *RaftSurfstore) GetFileInfoMap(ctx context.Context, empty *emptypb.Empty
 		// if not successful, retry
 		time.Sleep(100 * time.Millisecond)
 	}
-	return nil, errors.New("failed to find majority")
+	// return nil, errors.New("failed to find majority")
 }
 
 func (s *RaftSurfstore) GetBlockStoreMap(ctx context.Context, hashes *BlockHashes) (*BlockStoreMap, error) {
 	for {
-		s.isLeaderMutex.RLock()
-		if !s.isLeader {
-			s.isLeaderMutex.RUnlock()
-			return nil, ERR_NOT_LEADER
-		} else {
-			s.isLeaderMutex.RUnlock()
-		}
-		s.isCrashedMutex.RLock()
-		if s.isCrashed {
-			s.isCrashedMutex.RUnlock()
+		if s.CheckIfCrashed() {
 			return nil, ERR_SERVER_CRASHED
-		} else {
-			s.isCrashedMutex.RUnlock()
+		}
+		if !s.CheckIfLeader() {
+			return nil, ERR_NOT_LEADER
 		}
 
 		// send heartbeat to all other servers
@@ -99,12 +81,11 @@ func (s *RaftSurfstore) GetBlockStoreMap(ctx context.Context, hashes *BlockHashe
 		if err != nil {
 			return nil, err
 		}
-		s.isLeaderMutex.RLock()
-		if !s.isLeader {
-			s.isLeaderMutex.RUnlock()
+		if s.CheckIfCrashed() {
+			return nil, ERR_SERVER_CRASHED
+		}
+		if !s.CheckIfLeader() {
 			return nil, ERR_NOT_LEADER
-		} else {
-			s.isLeaderMutex.RUnlock()
 		}
 
 		if hb.Flag {
@@ -115,24 +96,16 @@ func (s *RaftSurfstore) GetBlockStoreMap(ctx context.Context, hashes *BlockHashe
 		// if not successful, retry
 		time.Sleep(100 * time.Millisecond)
 	}
-	return nil, errors.New("failed to find majority")
+	// return nil, errors.New("failed to find majority")
 }
 
 func (s *RaftSurfstore) GetBlockStoreAddrs(ctx context.Context, empty *emptypb.Empty) (*BlockStoreAddrs, error) {
 	for {
-		s.isLeaderMutex.RLock()
-		if !s.isLeader {
-			s.isLeaderMutex.RUnlock()
-			return nil, ERR_NOT_LEADER
-		} else {
-			s.isLeaderMutex.RUnlock()
-		}
-		s.isCrashedMutex.RLock()
-		if s.isCrashed {
-			s.isCrashedMutex.RUnlock()
+		if s.CheckIfCrashed() {
 			return nil, ERR_SERVER_CRASHED
-		} else {
-			s.isCrashedMutex.RUnlock()
+		}
+		if !s.CheckIfLeader() {
+			return nil, ERR_NOT_LEADER
 		}
 
 		// send heartbeat to all other servers
@@ -140,12 +113,11 @@ func (s *RaftSurfstore) GetBlockStoreAddrs(ctx context.Context, empty *emptypb.E
 		if err != nil {
 			return nil, err
 		}
-		s.isLeaderMutex.RLock()
-		if !s.isLeader {
-			s.isLeaderMutex.RUnlock()
+		if s.CheckIfCrashed() {
+			return nil, ERR_SERVER_CRASHED
+		}
+		if !s.CheckIfLeader() {
 			return nil, ERR_NOT_LEADER
-		} else {
-			s.isLeaderMutex.RUnlock()
 		}
 
 		if hb.Flag {
@@ -156,37 +128,32 @@ func (s *RaftSurfstore) GetBlockStoreAddrs(ctx context.Context, empty *emptypb.E
 		// if not successful, retry
 		time.Sleep(100 * time.Millisecond)
 	}
-	return nil, errors.New("failed to find majority")
+	// return nil, errors.New("failed to find majority")
 }
 
 func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) (*Version, error) {
-	s.isLeaderMutex.RLock()
-	if !s.isLeader {
-		s.isLeaderMutex.RUnlock()
+	// check if leader
+	if !s.CheckIfLeader() {
 		return nil, ERR_NOT_LEADER
-	} else {
-		s.isLeaderMutex.RUnlock()
+	}
+	// check if crashed
+	if s.CheckIfCrashed() {
+		return nil, ERR_SERVER_CRASHED
 	}
 
-	s.isCrashedMutex.RLock()
-	if s.isCrashed {
-		s.isCrashedMutex.RUnlock()
-		return nil, ERR_SERVER_CRASHED
-	} else {
-		s.isCrashedMutex.RUnlock()
-	}
 	// append entry to log
 	s.log = append(s.log, &UpdateOperation{
 		Term:         s.term,
 		FileMetaData: filemeta,
 	})
 	for {
-		s.isCrashedMutex.RLock()
-		if s.isCrashed {
-			s.isCrashedMutex.RUnlock()
+		// check if leader
+		if !s.CheckIfLeader() {
+			return nil, ERR_NOT_LEADER
+		}
+		// check if crashed
+		if s.CheckIfCrashed() {
 			return nil, ERR_SERVER_CRASHED
-		} else {
-			s.isCrashedMutex.RUnlock()
 		}
 		// send AppendEntries RPC to all other servers
 		_, err := s.SendToAllPeers(ctx)
@@ -205,7 +172,7 @@ func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) 
 		time.Sleep(1000 * time.Millisecond)
 	}
 	// TODO change this to return the version of the file
-	return &Version{Version: filemeta.Version}, nil
+	// return &Version{Version: filemeta.Version}, nil
 }
 
 func (s *RaftSurfstore) SendToAllPeers(ctx context.Context) (int, error) {
@@ -228,12 +195,8 @@ func (s *RaftSurfstore) SendToAllPeers(ctx context.Context) (int, error) {
 		}
 	}
 
-	s.isLeaderMutex.RLock()
-	if !s.isLeader {
-		s.isLeaderMutex.RUnlock()
+	if !s.CheckIfLeader() {
 		return 0, ERR_NOT_LEADER
-	} else {
-		s.isLeaderMutex.RUnlock()
 	}
 
 	// sort matchIndexList in descending order
@@ -316,12 +279,8 @@ func (s *RaftSurfstore) SendToPeer(ctx context.Context, peer_id int, responses c
 // of last new entry)
 func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInput) (*AppendEntryOutput, error) {
 	// TODO check if server is in crash mode
-	s.isCrashedMutex.RLock()
-	if s.isCrashed {
-		s.isCrashedMutex.RUnlock()
+	if s.CheckIfCrashed() {
 		return nil, ERR_SERVER_CRASHED
-	} else {
-		s.isCrashedMutex.RUnlock()
 	}
 
 	if input.Term > s.term {
@@ -397,12 +356,9 @@ func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInp
 }
 
 func (s *RaftSurfstore) SetLeader(ctx context.Context, _ *emptypb.Empty) (*Success, error) {
-	s.isCrashedMutex.RLock()
-	if s.isCrashed {
-		s.isCrashedMutex.RUnlock()
+	// check if server is in crash mode
+	if s.CheckIfCrashed() {
 		return nil, ERR_SERVER_CRASHED
-	} else {
-		s.isCrashedMutex.RUnlock()
 	}
 	s.isLeaderMutex.Lock()
 	defer s.isLeaderMutex.Unlock()
@@ -421,19 +377,11 @@ func (s *RaftSurfstore) SetLeader(ctx context.Context, _ *emptypb.Empty) (*Succe
 
 func (s *RaftSurfstore) SendHeartbeat(ctx context.Context, _ *emptypb.Empty) (*Success, error) {
 	// contact all followers, send AppendEntries RPC with empty entries
-	s.isCrashedMutex.RLock()
-	if s.isCrashed {
-		s.isCrashedMutex.RUnlock()
+	if s.CheckIfCrashed() {
 		return nil, ERR_SERVER_CRASHED
-	} else {
-		s.isCrashedMutex.RUnlock()
 	}
-	s.isLeaderMutex.RLock()
-	if !s.isLeader {
-		s.isLeaderMutex.RUnlock()
-		return &Success{Flag: false}, nil
-	} else {
-		s.isLeaderMutex.RUnlock()
+	if !s.CheckIfLeader() {
+		return nil, ERR_NOT_LEADER
 	}
 
 	totalActive, err := s.SendToAllPeers(ctx)
@@ -444,6 +392,17 @@ func (s *RaftSurfstore) SendHeartbeat(ctx context.Context, _ *emptypb.Empty) (*S
 		return &Success{Flag: true}, nil
 	}
 	return &Success{Flag: false}, nil
+}
+
+func (s *RaftSurfstore) CheckIfLeader() bool {
+	s.isLeaderMutex.RLock()
+	defer s.isLeaderMutex.RUnlock()
+	return s.isLeader
+}
+func (s *RaftSurfstore) CheckIfCrashed() bool {
+	s.isCrashedMutex.RLock()
+	defer s.isCrashedMutex.RUnlock()
+	return s.isCrashed
 }
 
 // ========== DO NOT MODIFY BELOW THIS LINE =====================================
